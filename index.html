@@ -1,1 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physics Pro Solver (Fixed)</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --accent: #0ea5e9;
+            --bg-body: #f1f5f9;
+            --bg-sidebar: #0f172a;
+            --text-sidebar: #e2e8f0;
+            --text-main: #334155;
+            --white: #ffffff;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --radius: 12px;
+            --sidebar-width: 280px;
+        }
 
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
+
+        body { background-color: var(--bg-body); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; }
+
+        /* --- Sidebar --- */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--bg-sidebar);
+            color: var(--text-sidebar);
+            height: 100%;
+            position: absolute;
+            left: 0; top: 0;
+            z-index: 100;
+            transition: transform 0.4s ease;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.3);
+        }
+        .sidebar.closed { transform: translateX(-100%); }
+
+        .brand { padding: 2rem; font-size: 1.4rem; font-weight: bold; color: var(--accent); border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; }
+        .nav-links { list-style: none; padding: 1rem; flex-grow: 1; }
+        .nav-item { margin-bottom: 0.5rem; }
+        .nav-btn {
+            width: 100%; text-align: left; padding: 1rem; background: rgba(255,255,255,0.05); border: none;
+            color: var(--text-sidebar); cursor: pointer; border-radius: var(--radius); font-size: 1rem;
+            transition: 0.2s; display: flex; align-items: center; gap: 10px;
+        }
+        .nav-btn:hover { background: var(--primary); color: var(--white); transform: translateX(5px); }
+
+        /* --- Main Content --- */
+        .main-wrapper {
+            flex-grow: 1; height: 100%; display: flex; flex-direction: column;
+            margin-left: var(--sidebar-width); transition: margin-left 0.4s ease;
+        }
+        .sidebar.closed + .main-wrapper { margin-left: 0; }
+
+        header {
+            height: 70px; background: var(--white); display: flex; align-items: center; padding: 0 1.5rem;
+            box-shadow: var(--shadow); position: sticky; top: 0; z-index: 90;
+        }
+        .hamburger { background: none; border: none; cursor: pointer; padding: 0.5rem; display: flex; flex-direction: column; gap: 5px; }
+        .hamburger span { display: block; width: 25px; height: 3px; background-color: var(--text-main); border-radius: 2px; }
+        .page-title { font-size: 1.25rem; font-weight: 700; color: var(--primary-dark); margin-left: 1rem; }
+
+        /* --- Content Area --- */
+        .content-scroll { flex-grow: 1; padding: 2rem; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; }
+        
+        .card { background: var(--white); padding: 2rem; border-radius: var(--radius); box-shadow: var(--shadow); width: 100%; max-width: 600px; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        h2 { margin-bottom: 1.5rem; color: var(--primary-dark); border-bottom: 2px solid var(--bg-body); padding-bottom: 0.5rem; }
+
+        .sub-btn {
+            width: 100%; padding: 1rem; background: var(--bg-body); border: 1px solid #cbd5e1; border-radius: var(--radius);
+            text-align: left; cursor: pointer; font-weight: 600; color: var(--text-main); margin-bottom: 0.75rem; transition: 0.2s;
+        }
+        .sub-btn:hover { background: #e2e8f0; border-color: var(--primary); }
+
+        /* --- Solver Forms --- */
+        .form-group { margin-bottom: 1.25rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--secondary); font-size: 0.9rem; }
+        input, select { width: 100%; padding: 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem; transition: 0.2s; }
+        input:focus, select:focus { outline: none; border-color: var(--primary); }
+
+        .calc-target-box { background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px dashed #cbd5e1; margin-bottom: 1.5rem; }
+        .calc-target-label { font-size: 0.85rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem; display: block; }
+
+        .calculate-btn { width: 100%; padding: 1rem; background: var(--primary); color: var(--white); border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 1rem; transition: 0.2s; }
+        .calculate-btn:hover { background: var(--primary-dark); }
+
+        .result-box { margin-top: 2rem; padding: 1.5rem; background-color: #eff6ff; border-left: 5px solid var(--primary); border-radius: 4px; display: none; }
+        .result-box.visible { display: block; animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .result-title { font-size: 0.9rem; color: var(--secondary); font-weight: bold; margin-bottom: 0.25rem; }
+        .result-value { font-size: 1.8rem; font-weight: 800; color: var(--primary-dark); }
+        .unit { font-size: 1rem; color: var(--secondary); font-weight: normal; }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar" id="sidebar">
+        <div class="brand">Physix Pro</div>
+        <ul class="nav-links">
+            <li class="nav-item"><button class="nav-btn" onclick="loadMainSection('energy')">⚡ Energy & Work</button></li>
+            <li class="nav-item"><button class="nav-btn" onclick="loadMainSection('momentum')">🚀 Momentum & Collisions</button></li>
+            <li class="nav-item"><button class="nav-btn" onclick="loadMainSection('electricity')">💡 Electricity</button></li>
+        </ul>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-wrapper">
+        <header>
+            <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="page-title" id="pageTitle">Physics Solver</div>
+        </header>
+
+        <main class="content-scroll" id="mainContent">
+            <div class="card" style="text-align: center; padding: 3rem;">
+                <h2>Select a Topic</h2>
+                <p style="color: #64748b;">Use the menu to start solving.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- JAVASCRIPT -->
+    <script>
+        // DOM Elements
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('mainContent');
+        const pageTitle = document.getElementById('pageTitle');
+
+        function toggleSidebar() { sidebar.classList.toggle('closed'); }
+
+        // --- SECTIONS DATA ---
+        const sections = {
+            energy: {
+                title: "Energy & Work",
+                topics: [
+                    { id: 'ke', name: 'Kinetic Energy (KE)' },
+                    { id: 'peg', name: 'Gravitational Potential (PEg)' },
+                    { id: 'pee', name: 'Elastic Potential (PEe)' },
+                    { id: 'work', name: 'Work (W = Fd cosθ)' },
+                    { id: 'me', name: 'Mechanical Energy Conservation' }
+                ]
+            },
+            momentum: {
+                title: "Momentum & Collisions",
+                topics: [
+                    { id: 'mom', name: 'Momentum (p = mv)' },
+                    { id: 'imp', name: 'Impulse (J = FΔt)' },
+                    { id: 'col-elas', name: 'Elastic Collision (Bounce)' },
+                    { id: 'col-inel', name: 'Inelastic Collision (Stick)' }
+                ]
+            },
+            electricity: {
+                title: "Electricity & Power",
+                topics: [
+                    { id: 'ohms', name: 'Ohm\'s Law & Power' },
+                    { id: 'elec-eng', name: 'Electrical Energy (E = Pt)' }
+                ]
+            }
+        };
+
+        function loadMainSection(sectionId) {
+            const data = sections[sectionId];
+            pageTitle.innerText = data.title;
+            sidebar.classList.add('closed'); // Slide left
+
+            let html = `<div class="card"><h2>${data.title}</h2>`;
+            data.topics.forEach(topic => {
+                html += `<button class="sub-btn" onclick="loadUniversalSolver('${topic.id}')">${topic.name}</button>`;
+            });
+            html += `</div>`;
+            mainContent.innerHTML = html;
+        }
+
+        // --- SOLVER CONFIGURATIONS ---
+        // IDs here MUST match the IDs in 'sections' exactly
+        const solvers = {
+            ke: {
+                vars: [
+                    { id: 'ke', label: 'Kinetic Energy (J)' },
+                    { id: 'm', label: 'Mass (kg)' },
+                    { id: 'v', label: 'Velocity (m/s)' }
+                ],
+                solve: (target, vals) => {
+                    if(target === 'ke') return 0.5 * vals.m * Math.pow(vals.v, 2);
+                    if(target === 'm') return 2 * vals.ke / Math.pow(vals.v, 2);
+                    if(target === 'v') return Math.sqrt(2 * vals.ke / vals.m);
+                }
+            },
+            peg: {
+                vars: [
+                    { id: 'pe', label: 'Potential Energy (J)' },
+                    { id: 'm', label: 'Mass (kg)' },
+                    { id: 'g', label: 'Gravity (m/s²)' },
+                    { id: 'h', label: 'Height (m)' }
+                ],
+                solve: (target, vals) => {
+                    if(target === 'pe') return vals.m * vals.g * vals.h;
+                    if(target === 'm') return vals.pe / (vals.g * vals.h);
+                    if(target === 'g') return vals.pe / (vals.m * vals.h);
+                    if(target === 'h') return vals.pe / (vals.m * vals.g);
+                }
+            },
+            pee: {
+                vars: [
+                    { id: 'pe', label: 'Elastic Potential (J)' },
+                    { id: 'k', label: 'Spring Constant (N/m)' },
+                    { id: 'x', label: 'Displacement (m)' }
+                ],
+                solve: (target, vals) => {
+                    if(target === 'pe') return 0.5 * vals.k * Math.pow(vals.x, 2);
+                    if(target === 'k') return 2 * vals.pe / Math.pow(vals.x, 2);
+                    if(target === 'x') return Math.sqrt(2 * vals.pe / vals.k);
+                }
+            },
+            work: {
+                vars: [
+                    { id: 'w', label: 'Work (J)' },
+                    { id: 'f', label: 'Force (N)' },
+                    { id: 'd', label: 'Distance (m)' },
+                    { id: 'a', label: 'Angle (degrees)' }
+                ],
+                solve: (target, vals) => {
+                    const rad = vals.a * (Math.PI / 180);
+                    const cosTheta = Math.cos(rad);
+                    if(target === 'w') return vals.f * vals.d * cosTheta;
+                    if(target === 'f') return vals.w / (vals.d * cosTheta);
+                    if(target === 'd') return vals.w / (vals.f * cosTheta);
+                    if(target === 'a') {
+                        const cosVal = vals.w / (vals.f * vals.d);
+                        if(cosVal > 1 || cosVal < -1) return "Invalid Geometry";
+                        return Math.acos(cosVal) * (180 / Math.PI);
+                    }
+                }
+            },
+            mom: {
+                vars: [
+                    { id: 'p', label: 'Momentum (kg·m/s)' },
+                    { id: 'm', label: 'Mass (kg)' },
+                    { id: 'v', label: 'Velocity (m/s)' }
+                ],
+                solve: (target, vals) => {
+                    if(target === 'p') return vals.m * vals.v;
+                    if(target === 'm') return vals.p / vals.v;
+                    if(target === 'v') return vals.p / vals.m;
+                }
+            },
+            imp: {
+                vars: [
+                    { id: 'j', label: 'Impulse (N·s)' },
+                    { id: 'f', label: 'Force (N)' },
+                    { id: 't', label: 'Time Change (s)' }
+                ],
+                solve: (target, vals) => {
+                    if(target === 'j') return vals.f * vals.t;
+                    if(target === 'f') return vals.j / vals.t;
+                    if(target === 't') return vals.j / vals.f;
+                }
+            },
+            'col-inel': { // FIXED: Was 'colinel', now matches 'col-inel'
+                vars: [
+                    { id: 'm1', label: 'Mass 1 (kg)' },
+                    { id: 'm2', label: 'Mass 2 (kg)' },
+                    { id: 'v1i', label: 'Velocity 1 Initial (m/s)' },
+                    { id: 'v2i', label: 'Velocity 2 Initial (m/s)' },
+                    { id: 'vf', label: 'Final Velocity (m/s)' }
+                ],
+                solve: (target, vals) => {
+                    // (m1+m2)vf = m1*v1i + m2*v2i
+                    const LHS = (vals.m1 + vals.m2) * vals.vf;
+                    const RHS_moment = (vals.m1 * vals.v1i) + (vals.m2 * vals.v2i);
+
+                    if(target === 'vf') return ((vals.m1 * vals.v1i) + (vals.m2 * vals.v2i)) / (vals.m1 + vals.m2);
+                    if(target === 'v1i') return (LHS - (vals.m2 * vals.v2i)) / vals.m1;
+                    if(target === 'v2i') return (LHS - (vals.m1 * vals.v1i)) / vals.m2;
+                    // Derivation for Mass with unknown Velocity:
+                    // m1(v1i - vf) = m2(vf - v2i)
+                    if(target === 'm1') return (vals.m2 * (vals.vf - vals.v2i)) / (vals.v1i - vals.vf);
+                    if(target === 'm2') return (vals.m1 * (vals.v1i - vals.vf)) / (vals.vf - vals.v2i);
+                }
+            },
+            'elec-eng': { // FIXED: Was 'eleceng', now matches 'elec-eng'
+                vars: [
+                    { id: 'e', label: 'Energy (J)' },
+                    { id: 'p', label: 'Power (W)' },
+                    { id: 't', label: 'Time (s)' }
+                ],
+                solve: (target, vals) => {
+                    if(target === 'e') return vals.p * vals.t;
+                    if(target === 'p') return vals.e / vals.t;
+                    if(target === 't') return vals.e / vals.p;
+                }
+            }
+        };
+
+        // --- SPECIAL HANDLERS (Defined before usage) ---
+
+        function loadElasticCollision() {
+            let html = `
+                <div class="card">
+                    <h2>Elastic Collision (Bounce)</h2>
+                    <p style="font-size:0.9rem; color:#64748b; margin-bottom:1rem;">
+                        Conserves Momentum AND Kinetic Energy.
+                    </p>
+                    <div class="calc-target-box">
+                        <span class="calc-target-label">Calculate:</span>
+                        <select id="elasMode" onchange="renderElasInputs()">
+                            <option value="finals">Final Velocities (v1f, v2f)</option>
+                            <option value="initials">Initial Velocities (v1i, v2i)</option>
+                        </select>
+                    </div>
+                    <div id="elasInputs"></div>
+                    <button class="calculate-btn" onclick="solveElas()">Calculate</button>
+                    <div id="resultArea" class="result-box"></div>
+                </div>
+            `;
+            mainContent.innerHTML = html;
+            renderElasInputs();
+        }
+
+        function renderElasInputs() {
+            const mode = document.getElementById('elasMode').value;
+            const container = document.getElementById('elasInputs');
+            let html = '';
+
+            html += createInput(['Mass 1 (m1)', 'Mass 2 (m2)'], ['m1', 'm2']);
+            
+            if(mode === 'finals') {
+                html += createInput(['Init Velocity 1 (v1i)', 'Init Velocity 2 (v2i)'], ['v1i', 'v2i']);
+            } else {
+                html += createInput(['Final Velocity 1 (v1f)', 'Final Velocity 2 (v2f)'], ['v1f', 'v2f']);
+            }
+            container.innerHTML = html;
+        }
+
+        function solveElas() {
+            const m1 = getVal('m1'), m2 = getVal('m2');
+            const mode = document.getElementById('elasMode').value;
+            let resultHtml = '';
+
+            if(mode === 'finals') {
+                const v1i = getVal('v1i'), v2i = getVal('v2i');
+                const v1f = ((m1-m2)*v1i + 2*m2*v2i) / (m1+m2);
+                const v2f = ((m2-m1)*v2i + 2*m1*v1i) / (m1+m2);
+                resultHtml = `
+                    <div class="result-title">Results</div>
+                    <div class="result-value" style="font-size:1.4rem">
+                        v1_final: ${v1f.toFixed(2)} m/s<br>
+                        v2_final: ${v2f.toFixed(2)} m/s
+                    </div>
+                `;
+            } else {
+                const v1f = getVal('v1f'), v2f = getVal('v2f');
+                const v1i = ((m1-m2)*v1f + 2*m2*v2f) / (m1+m2);
+                const v2i = ((m2-m1)*v2f + 2*m1*v1f) / (m1+m2);
+                resultHtml = `
+                    <div class="result-title">Results</div>
+                    <div class="result-value" style="font-size:1.4rem">
+                        v1_initial: ${v1i.toFixed(2)} m/s<br>
+                        v2_initial: ${v2i.toFixed(2)} m/s
+                    </div>
+                `;
+            }
+            const box = document.getElementById('resultArea');
+            box.innerHTML = resultHtml;
+            box.classList.add('visible');
+        }
+
+        function loadMechanicalEnergy() {
+            const vars = ['m', 'g', 'hi', 'hf', 'vi', 'vf'];
+            
+            let html = `
+                <div class="card">
+                    <h2>Mechanical Energy Conservation</h2>
+                    <div class="calc-target-box">
+                        <span class="calc-target-label">Solve for:</span>
+                        <select id="meTarget" onchange="renderMEInputs()">
+                            <option value="vf">Final Velocity (vf)</option>
+                            <option value="vi">Initial Velocity (vi)</option>
+                            <option value="hf">Final Height (hf)</option>
+                            <option value="hi">Initial Height (hi)</option>
+                        </select>
+                    </div>
+                    <div id="meInputs"></div>
+                    <button class="calculate-btn" onclick="solveME()">Calculate</button>
+                    <div id="resultArea" class="result-box"></div>
+                </div>
+            `;
+            mainContent.innerHTML = html;
+            renderMEInputs();
+        }
+
+        function renderMEInputs() {
+            const target = document.getElementById('meTarget').value;
+            const container = document.getElementById('meInputs');
+            const inputs = [
+                {id:'m', l:'Mass (kg)', val:10},
+                {id:'g', l:'Gravity (m/s²)', val:9.8}
+            ];
+            if(target !== 'vi') inputs.push({id:'vi', l:'Initial Velocity (m/s)', val:0});
+            if(target !== 'hi') inputs.push({id:'hi', l:'Initial Height (m)', val:0});
+            if(target !== 'vf') inputs.push({id:'vf', l:'Final Velocity (m/s)', val:0});
+            if(target !== 'hf') inputs.push({id:'hf', l:'Final Height (m)', val:0});
+
+            container.innerHTML = inputs.map(i => `
+                <div class="form-group"><label>${i.l}</label><input type="number" step="any" id="inp_${i.id}" value="${i.val}"></div>
+            `).join('');
+        }
+
+        function solveME() {
+            const m = getVal('m'), g = getVal('g');
+            const hi = getVal('hi'), hf = getVal('hf');
+            const vi = getVal('vi'), vf = getVal('vf');
+            const target = document.getElementById('meTarget').value;
+            
+            let res = 0;
+            if(target === 'vf') {
+                const term = (g*hi) + (0.5*vi*vi) - (g*hf);
+                if(term < 0) return alert("Physics Error: Result is imaginary.");
+                res = Math.sqrt(2*term);
+            } else if(target === 'vi') {
+                const term = (g*hf) + (0.5*vf*vf) - (g*hi);
+                if(term < 0) return alert("Physics Error: Result is imaginary.");
+                res = Math.sqrt(2*term);
+            } else if(target === 'hf') {
+                res = ((0.5*vi*vi) + (g*hi) - (0.5*vf*vf)) / g;
+            } else if(target === 'hi') {
+                res = ((0.5*vf*vf) + (g*hf) - (0.5*vi*vi)) / g;
+            }
+            showResult(res, "m/s or m");
+        }
+
+        function loadElectricity() {
+            let html = `
+                <div class="card">
+                    <h2>Electricity (Power & Ohm's Law)</h2>
+                    <div class="calc-target-box">
+                        <span class="calc-target-label">Calculate:</span>
+                        <select id="elecTarget" onchange="renderElecInputs()">
+                            <option value="v">Voltage (V)</option>
+                            <option value="i">Current (I)</option>
+                            <option value="r">Resistance (R)</option>
+                            <option value="p">Power (P)</option>
+                        </select>
+                    </div>
+                    <div id="elecInputs"></div>
+                    <button class="calculate-btn" onclick="solveElec()">Calculate</button>
+                    <div id="resultArea" class="result-box"></div>
+                </div>
+            `;
+            mainContent.innerHTML = html;
+            renderElecInputs();
+        }
+
+        function renderElecInputs() {
+            const target = document.getElementById('elecTarget').value;
+            const container = document.getElementById('elecInputs');
+            let html = '';
+
+            if(target === 'v') {
+                html += createInput(['Current (I) - Amps', 'Resistance (R) - Ohms'], ['i', 'r']);
+            } else if(target === 'i') {
+                html += createInput(['Voltage (V) - Volts', 'Resistance (R) - Ohms'], ['v', 'r']);
+            } else if(target === 'r') {
+                html += createInput(['Voltage (V) - Volts', 'Current (I) - Amps'], ['v', 'i']);
+            } else if(target === 'p') {
+                html += `<div class="form-group"><label>Calculate P using:</label>
+                         <select id="pMode" onchange="renderPMode()">
+                            <option value="vi">Voltage & Current</option>
+                            <option value="i2r">Current & Resistance</option>
+                            <option value="v2r">Voltage & Resistance</option>
+                         </select></div>`;
+                html += `<div id="pModeInputs"></div>`;
+            }
+            container.innerHTML = html;
+            if(target === 'p') renderPMode();
+        }
+
+        function renderPMode() {
+            const mode = document.getElementById('pMode').value;
+            const container = document.getElementById('pModeInputs');
+            let h = '';
+            if(mode === 'vi') h = createInput(['Voltage (V)', 'Current (I)'], ['v', 'i']);
+            if(mode === 'i2r') h = createInput(['Current (I)', 'Resistance (R)'], ['i', 'r']);
+            if(mode === 'v2r') h = createInput(['Voltage (V)', 'Resistance (R)'], ['v', 'r']);
+            container.innerHTML = h;
+        }
+
+        function solveElec() {
+            const target = document.getElementById('elecTarget').value;
+            let res = 0, unit = '';
+
+            if(target === 'v') {
+                res = getVal('i') * getVal('r'); unit = "Volts (V)";
+            } else if(target === 'i') {
+                res = getVal('v') / getVal('r'); unit = "Amps (A)";
+            } else if(target === 'r') {
+                res = getVal('v') / getVal('i'); unit = "Ohms (Ω)";
+            } else if(target === 'p') {
+                const mode = document.getElementById('pMode').value;
+                if(mode === 'vi') res = getVal('v') * getVal('i');
+                if(mode === 'i2r') res = Math.pow(getVal('i'), 2) * getVal('r');
+                if(mode === 'v2r') res = Math.pow(getVal('v'), 2) / getVal('r');
+                unit = "Watts (W)";
+            }
+            showResult(res, unit);
+        }
+
+        // --- UNIVERSAL SOLVER ENGINE ---
+
+        function loadUniversalSolver(id) {
+            // Check for special handlers first
+            if(id === 'me') return loadMechanicalEnergy();
+            if(id === 'ohms') return loadElectricity();
+            if(id === 'col-elas') return loadElasticCollision();
+
+            // Standard Universal Solvers (Simple Algebra)
+            const def = solvers[id];
+            if(!def) return alert("Error: Calculator not defined.");
+
+            let html = `
+                <div class="card">
+                    <h2>${def.vars[0].label.split(' ')[0]} Calculator</h2>
+                    <div class="calc-target-box">
+                        <span class="calc-target-label">I want to solve for:</span>
+                        <select id="solveTarget" onchange="updateInputs('${id}')">
+                            ${def.vars.map(v => `<option value="${v.id}">${v.label}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div id="inputsContainer"></div>
+                    <button class="calculate-btn" onclick="runCalc('${id}')">Calculate</button>
+                    <div id="resultArea" class="result-box"></div>
+                </div>
+            `;
+            mainContent.innerHTML = html;
+            updateInputs(id);
+        }
+
+        function updateInputs(id) {
+            const def = solvers[id];
+            const targetId = document.getElementById('solveTarget').value;
+            const container = document.getElementById('inputsContainer');
+            
+            let html = '';
+            def.vars.forEach(v => {
+                if(v.id === targetId) return;
+                html += `
+                    <div class="form-group">
+                        <label>${v.label}</label>
+                        <input type="number" step="any" id="inp_${v.id}" placeholder="Enter value">
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function runCalc(id) {
+            const def = solvers[id];
+            const targetId = document.getElementById('solveTarget').value;
+            const vals = {};
+
+            def.vars.forEach(v => {
+                if(v.id !== targetId) {
+                    const val = parseFloat(document.getElementById('inp_' + v.id).value);
+                    if(isNaN(val)) {
+                        alert(`Please enter a valid number for ${v.label}`);
+                        throw new Error("Invalid Input");
+                    }
+                    vals[v.id] = val;
+                }
+            });
+
+            const result = def.solve(targetId, vals);
+            const targetVar = def.vars.find(v => v.id === targetId);
+            const unit = targetVar.label.match(/\((.*?)\)/)[1];
+
+            const resArea = document.getElementById('resultArea');
+            resArea.innerHTML = `
+                <div class="result-title">Result (${targetVar.label})</div>
+                <div class="result-value">${parseFloat(result.toFixed(4))} <span class="unit">${unit}</span></div>
+            `;
+            resArea.classList.add('visible');
+        }
+
+        // --- UTILS ---
+        function createInput(labels, ids) {
+            return labels.map((l,i) => `
+                <div class="form-group"><label>${l}</label><input type="number" step="any" id="inp_${ids[i]}"></div>
+            `).join('');
+        }
+        function getVal(id) { return parseFloat(document.getElementById('inp_'+id).value); }
+        function showResult(val, unit) {
+            const box = document.getElementById('resultArea');
+            box.innerHTML = `<div class="result-title">Result</div><div class="result-value">${parseFloat(val.toFixed(4))} <span class="unit">${unit}</span></div>`;
+            box.classList.add('visible');
+        }
+
+    </script>
+</body>
+</html>
